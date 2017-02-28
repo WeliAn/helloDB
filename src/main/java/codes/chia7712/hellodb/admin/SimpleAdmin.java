@@ -114,8 +114,8 @@ class SimpleAdmin implements Admin {
       rowIO.readIndex(cell, path);
       String key = new String(cell.getColumnArray());
       if (cells.containsKey(key)) {
-        rowIO.writeIfExits(path, key, cell);
-        rowIO.writeIndexAndCell(path.toString());
+        rowIO.writeIfExits(path.toString() + "cell", key, cell);
+        rowIO.writeIndexAndCell(cell, path.toString());
         return true;
       } else {
         rowIO.writeIfNotExits(path, cell.getColumnArray(),
@@ -174,7 +174,7 @@ class SimpleAdmin implements Admin {
       String key = new String(column);
       if (cells.containsKey(key)) {
         cells.remove(key);
-        rowIO.writeIndexAndCell(path.toString());
+        rowIO.writeCellOnly(path.toString());
         return true;
       } else {
         return false;
@@ -186,8 +186,14 @@ class SimpleAdmin implements Admin {
     public boolean insertIfAbsent(Cell cell) throws IOException {
       StringBuilder sb = new StringBuilder();
       sb.append(TABLES_PATH).append(name).append(SLASH).append(new String(cell.getRowArray())).append(SLASH);
-
-      return data.putIfAbsent(cell, cell) == null;
+      rowIO.readIndex(cell, sb);
+      if (cells.containsKey(new String(cell.getColumnArray()))) {
+        return false;
+      } else {
+        rowIO.writeIfNotExits(sb, cell.getColumnArray(), cell.getColumnLength(), cell.getValueArray(), cell.getValueLength());
+        return true;
+      }
+//      return data.putIfAbsent(cell, cell) == null;
     }
 
     @Override
@@ -227,14 +233,27 @@ class SimpleAdmin implements Admin {
       public RowIO() {
       }
 
-      private void writeIndexAndCell(String path) throws IOException {
-        String cellPath = path + "cell";
-        try (FileOutputStream fos = new FileOutputStream(cellPath);
+      private synchronized void writeCellOnly(String path) throws IOException {
+        String indexPath = path + "index";
+        try (FileOutputStream fos = new FileOutputStream(indexPath);
                 BufferedOutputStream bos = new BufferedOutputStream(fos)) {
-          StringBuilder cellOutput = new StringBuilder();
-          cells.entrySet().stream().forEach(v -> cellOutput.append(v.getKey())
-                  .append(new String(v.getValue().getValueArray())));
-          bos.write(cellOutput.toString().getBytes());
+          StringBuilder indexOutput = new StringBuilder();
+          cells.entrySet().stream().forEach(v -> indexOutput.append(v.getKey()).append(COMMA)
+                  .append(v.getValue().getColumnOffset()).append(COMMA).append(v.getValue().getColumnLength())
+                  .append(COMMA).append(v.getValue().getValueOffset()).append(COMMA)
+                  .append(v.getValue().getValueLength()).append("\n"));
+          call(indexOutput.toString());
+          bos.write(indexOutput.toString().getBytes());
+          bos.flush();
+        }
+      }
+
+      private synchronized void writeIndexAndCell(Cell cell, String path) throws IOException {
+        String cellPath = path + "cell";
+        try (FileOutputStream fos = new FileOutputStream(cellPath, true);
+                BufferedOutputStream bos = new BufferedOutputStream(fos)) {
+          bos.write(cell.getColumnArray());
+          bos.write(cell.getValueArray());
           bos.flush();
         }
         String indexPath = path + "index";
@@ -250,13 +269,14 @@ class SimpleAdmin implements Admin {
         }
       }
 
-      private void writeIfExits(StringBuilder indexPath, String key, Cell cell) throws IOException {
+      private synchronized void writeIfExits(String cellPath, String key, Cell cell) throws IOException {
 //        String index = indexPath.toString() + "index";
 //        String cellPath = indexPath.toString() + "cell";
+        int cellLength = getCellByteLength(cellPath);
         Cell c = cells.get(key);
         cells.put(key, Cell.createCell(cell.getRowArray(), 0, cell.getRowLength(),
-                cell.getColumnArray(), c.getColumnOffset(), cell.getColumnLength(),
-                cell.getValueArray(), c.getValueOffset(), cell.getValueLength()));
+                cell.getColumnArray(), cellLength, cell.getColumnLength(),
+                cell.getValueArray(), cellLength + cell.getColumnLength(), cell.getValueLength()));
 //        Cell modCell = cells.get(key);
 //        try (FileOutputStream fos = new FileOutputStream(index);
 //                BufferedOutputStream bos = new BufferedOutputStream(fos)) {
@@ -276,19 +296,9 @@ class SimpleAdmin implements Admin {
 
       private void writeIfNotExits(StringBuilder indexPath, byte[] col, int colLength,
               byte[] valueArray, int valueLength) throws IOException {
-        String index = indexPath.toString() + "index";
         String cellPath = indexPath.toString() + "cell";
-        int cellArraySize = 0;
-        try (FileInputStream fis = new FileInputStream(cellPath);
-                BufferedInputStream bis = new BufferedInputStream(fis)) {
-          int num = 0;
-          byte[] b = new byte[1];
-          while (bis.available() > 0) {
-            bis.read(b);
-            num++;
-          }
-          cellArraySize = num;
-        }
+        int cellArraySize = getCellByteLength(cellPath);
+        String index = indexPath.toString() + "index";
         try (FileOutputStream fos = new FileOutputStream(index, true);
                 BufferedOutputStream bos = new BufferedOutputStream(fos)) {
           StringBuilder sb = new StringBuilder();
@@ -305,8 +315,20 @@ class SimpleAdmin implements Admin {
         }
       }
 
-      private void readIndex(Cell cell, StringBuilder path) throws IOException {
-        MappedByteBuffer in;
+      private int getCellByteLength(String cellPath) throws IOException {
+        int num = 0;
+        try (FileInputStream fis = new FileInputStream(cellPath);
+                BufferedInputStream bis = new BufferedInputStream(fis)) {
+          byte[] b = new byte[1];
+          while (bis.available() > 0) {
+            bis.read(b);
+            num++;
+          }
+        }
+        return num;
+      }
+
+      private synchronized void readIndex(Cell cell, StringBuilder path) throws IOException {
         Cell c;
         byte[] valueArray;
         String line;
@@ -317,15 +339,14 @@ class SimpleAdmin implements Admin {
           createRow(paths);
         }
         try (Scanner sc = new Scanner(new FileInputStream(index), "UTF-8");
-                RandomAccessFile raf = new RandomAccessFile(cellPath, "r")) {
+                FileInputStream fis = new FileInputStream(cellPath);
+                BufferedInputStream bis = new BufferedInputStream(fis)) {
           while (sc.hasNextLine()) {
             line = sc.nextLine();
             if (line.length() > 0) {
               IndexParse(line);
-              valueArray = new byte[getValueLength()];
-              in = raf.getChannel()
-                      .map(FileChannel.MapMode.READ_ONLY, getValueOffset(), getValueLength());
-              in.get(valueArray);
+              valueArray = new byte[1024 * 1024];
+              bis.read(valueArray, getValueOffset(), getValueLength());
               c = Cell.createCell(cell.getRowArray(), 0, cell.getRowLength(),
                       getColArray(), getColOffset(), getColLength(),
                       valueArray, getValueOffset(), getValueLength());
@@ -335,7 +356,7 @@ class SimpleAdmin implements Admin {
         }
       }
 
-      private void readIndex(byte[] row, StringBuilder path) throws IOException {
+      private synchronized void readIndex(byte[] row, StringBuilder path) throws IOException {
         MappedByteBuffer in;
         Cell c;
         byte[] valueArray;

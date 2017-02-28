@@ -28,21 +28,30 @@ import java.util.concurrent.ConcurrentSkipListMap;
 public class TestWriteByte {
 
   public static void main(String[] args) throws IOException, ClassNotFoundException {
-    ConcurrentMap<String, String> cells = new ConcurrentSkipListMap();
-    cells.put("A", "1");
-    cells.put("B", "2");
-    cells.put("C", "3");
-    StringBuilder cellOutput = new StringBuilder();
-    cells.entrySet().stream().forEach(v -> cellOutput.append(v.getKey())
-            .append(v.getValue()));
-    System.out.println(cellOutput.toString());
 
-//    try (Scanner sc = new Scanner(new FileInputStream("F:\\helloDB\\TestTable\\row_v0\\index"), "UTF-8")) {
-//      while (sc.hasNextLine()) {
-//        String line = sc.nextLine();
-//        System.out.println(line);
-//      }
-//    }
+    try (Scanner sc = new Scanner(new FileInputStream("F:\\helloDB\\TestTable\\row_v0\\index"), "UTF-8");
+            FileInputStream fis = new FileInputStream("F:\\helloDB\\TestTable\\row_v0\\cell");
+            BufferedInputStream bis = new BufferedInputStream(fis)) {
+      while (sc.hasNextLine()) {
+        String line = sc.nextLine();
+        if (line.length() > 0) {
+          System.out.println(line.length());
+          byte[] valueArray = new byte[10];
+          bis.read(valueArray, 0, 5);
+          System.out.println(new String(valueArray));
+        }
+      }
+    }
+    try (FileOutputStream fos = new FileOutputStream("F:\\helloDB\\TestTable\\row_v0\\cell");
+            BufferedOutputStream bos = new BufferedOutputStream(fos)) {
+      bos.write("cell".getBytes());
+      bos.flush();
+    }
+    try (FileOutputStream fos = new FileOutputStream("F:\\helloDB\\TestTable\\row_v0\\index");
+            BufferedOutputStream bos = new BufferedOutputStream(fos)) {
+      bos.write("index".getBytes());
+      bos.flush();
+    }
 //    final String ROW = "row1";
 //    final String COL = "col1";
 //    final String VALUE = "value1";
