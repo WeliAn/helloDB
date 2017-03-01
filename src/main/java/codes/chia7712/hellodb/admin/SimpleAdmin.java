@@ -25,17 +25,21 @@ import java.util.stream.Collectors;
 class SimpleAdmin implements Admin {
 
   private final ConcurrentMap<String, Table> tables = new ConcurrentSkipListMap<>();
-  private final static String TABLES_PATH = "F:/helloDB/";
+  private final static String TABLES_PATH = "welian/";
   private final static String SLASH = "/";
   File f;
 
   SimpleAdmin(Properties prop) throws IOException {
     f = new File(TABLES_PATH);
-    String[] tablesDir = f.list();
-    for (String table : tablesDir) {
-      if (new File(TABLES_PATH + table).isDirectory()) {
-        tables.put(table, new SimpleTable(table));
+    if (f.exists()) {
+      String[] tablesDir = f.list();
+      for (String table : tablesDir) {
+        if (new File(TABLES_PATH + table).isDirectory()) {
+          tables.put(table, new SimpleTable(table));
+        }
       }
+    } else {
+      f.mkdirs();
     }
   }
 
@@ -189,6 +193,9 @@ class SimpleAdmin implements Admin {
       StringBuilder sb = new StringBuilder();
       sb.append(TABLES_PATH).append(name).append(SLASH).append(new String(cell.getRowArray())).append(SLASH);
       rowIO.readIndex(cell, sb);
+      System.out.println("cells size=" + cells.size());
+      System.out.println("col=" + new String(cell.getColumnArray()));
+      cells.keySet().stream().forEach(System.out::println);
       if (cells.containsKey(new String(cell.getColumnArray()))) {
         return false;
       } else {
@@ -347,7 +354,7 @@ class SimpleAdmin implements Admin {
               c = Cell.createCell(cell.getRowArray(), 0, cell.getRowLength(),
                       getColArray(), getColOffset(), getColLength(),
                       valueArray, getValueOffset(), getValueLength());
-              cells.put(new String(cell.getColumnArray()), c);
+//              cells.put(new String(cell.getColumnArray()), c);
             }
           }
         }

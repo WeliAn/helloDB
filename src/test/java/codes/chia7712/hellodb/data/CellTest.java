@@ -50,7 +50,7 @@ public class CellTest {
 
   @Test
   public void testCellContent() throws IOException {
-//    ADMIN.createTable(name.getMethodName());
+    ADMIN.createTable(name.getMethodName());
     Table t = ADMIN.openTable(name.getMethodName());
     Cell cell_v0 = Cell.createCell(ROW_V0, COLUMN_V0, VALUE_V0);
     Cell cell_v1 = Cell.createCell(ROW_V1, COLUMN_V0, VALUE_V0);

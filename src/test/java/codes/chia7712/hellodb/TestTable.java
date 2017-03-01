@@ -24,13 +24,13 @@ public class TestTable {
   private static Admin ADMIN;
   private static final String TABLE_NAME = "TestTable";
   private static final byte[] ROW_V0 = BytesUtil.toBytes("row_v0");
-  private static final byte[] VALUE_V0 = BytesUtil.toBytes("value_vB");
+  private static final byte[] VALUE_V0 = BytesUtil.toBytes("value_vA87");
 
   @BeforeClass
   public static void setUpClass() throws Exception {
     PROP.put(Admin.ADMIN_IMPL, Admin.DEFAULT_ADMIN_IMPL);
     ADMIN = Admin.create(PROP);
-//    ADMIN.createTable(TABLE_NAME);
+    ADMIN.createTable(TABLE_NAME);
   }
 
   @AfterClass
@@ -61,7 +61,7 @@ public class TestTable {
   @Test
   public void testInsert() throws Exception {
     Table t = ADMIN.openTable(TABLE_NAME);
-    Cell newCell = Cell.createCell(ROW_V0, BytesUtil.toBytes("A"), VALUE_V0);
+    Cell newCell = Cell.createCell(ROW_V0, BytesUtil.toBytes(name.getMethodName()), VALUE_V0);
     int firstCount = count(t.get(ROW_V0));
     t.insert(newCell);
     assertEquals(1 + firstCount, count(t.get(ROW_V0)));
@@ -116,8 +116,9 @@ public class TestTable {
   @Test
   public void testInsertIfAbsent() throws Exception {
     Table t = ADMIN.openTable(TABLE_NAME);
-    Cell newCell = Cell.createCell(ROW_V0, BytesUtil.toBytes((name.getMethodName())), VALUE_V0);
+    Cell newCell = Cell.createCell(ROW_V0, BytesUtil.toBytes(("B")), VALUE_V0);
     int firstCount = count(t.get(ROW_V0));
+    System.out.println(firstCount);
     assertTrue(t.insertIfAbsent(newCell));
     assertEquals(1 + firstCount, count(t.get(ROW_V0)));
     assertFalse(t.insertIfAbsent(newCell));

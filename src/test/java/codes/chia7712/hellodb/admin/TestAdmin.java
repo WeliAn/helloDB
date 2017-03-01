@@ -82,9 +82,10 @@ public class TestAdmin {
    */
   @Test
   public void testListTables() throws Exception {
-    for (String n : ADMIN.listTables()) {
-      ADMIN.deleteTable(n);
-    }
+    ADMIN.listTables().stream().forEach(System.out::println);
+//    for (String n : ADMIN.listTables()) {
+//      ADMIN.deleteTable(n);
+//    }
   }
 
 }
