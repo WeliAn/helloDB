@@ -8,8 +8,6 @@ import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.MappedByteBuffer;
@@ -19,7 +17,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Scanner;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ConcurrentSkipListMap;
@@ -28,8 +25,8 @@ import java.util.stream.Collectors;
 class SimpleAdmin implements Admin {
 
   private final ConcurrentMap<String, Table> tables = new ConcurrentSkipListMap<>();
-  private final static String TABLES_PATH = "F:\\helloDB\\";
-  private final static String SLASH = "\\";
+  private final static String TABLES_PATH = "F:/helloDB/";
+  private final static String SLASH = "/";
   File f;
 
   SimpleAdmin(Properties prop) throws IOException {
@@ -85,7 +82,6 @@ class SimpleAdmin implements Admin {
     tables.forEach((k, v) -> {
       try {
         v.close();
-        v = null;
       } catch (IOException ex) {
         System.out.println("Table " + k + " close failed");
       }
@@ -95,8 +91,8 @@ class SimpleAdmin implements Admin {
 
   private static class SimpleTable implements Table {
 
-    private static final CellComparator CELL_COMPARATOR = new CellComparator();
-    private static final ConcurrentNavigableMap<Cell, Cell> data = new ConcurrentSkipListMap<>(CELL_COMPARATOR);
+//    private static final CellComparator CELL_COMPARATOR = new CellComparator();
+//    private static final ConcurrentNavigableMap<Cell, Cell> data = new ConcurrentSkipListMap<>(CELL_COMPARATOR);
     private final String name;
     private static final String COMMA = ",";
     private static final ConcurrentMap<String, Cell> cells = new ConcurrentSkipListMap();
@@ -111,16 +107,19 @@ class SimpleAdmin implements Admin {
       StringBuilder path = new StringBuilder();
       path.append(TABLES_PATH).append(name).append(SLASH)
               .append(new String(cell.getRowArray())).append(SLASH);
+      String key = new String();
       rowIO.readIndex(cell, path);
-      String key = new String(cell.getColumnArray());
-      if (cells.containsKey(key)) {
-        rowIO.writeIfExits(path.toString() + "cell", key, cell);
-        rowIO.writeIndexAndCell(cell, path.toString());
-        return true;
-      } else {
-        rowIO.writeIfNotExits(path, cell.getColumnArray(),
-                cell.getColumnLength(), cell.getValueArray(), cell.getValueLength());
-        return false;
+      synchronized (key) {
+        key = new String(cell.getColumnArray());
+        if (cells.containsKey(key)) {
+          rowIO.writeIfExits(path.toString() + "cell", key, cell);
+          rowIO.writeIndexAndCell(cell, path.toString());
+          return true;
+        } else {
+          rowIO.writeIfNotExits(path, cell.getColumnArray(),
+                  cell.getColumnLength(), cell.getValueArray(), cell.getValueLength());
+          return false;
+        }
       }
 //      return data.put(cell, cell) != null;
     }
@@ -171,13 +170,16 @@ class SimpleAdmin implements Admin {
       StringBuilder path = new StringBuilder();
       path.append(TABLES_PATH).append(name).append(SLASH).append(new String(row)).append(SLASH);
       rowIO.readIndex(row, path);
-      String key = new String(column);
-      if (cells.containsKey(key)) {
-        cells.remove(key);
-        rowIO.writeCellOnly(path.toString());
-        return true;
-      } else {
-        return false;
+      String key = new String();;
+      synchronized (key) {
+        key = new String(column);
+        if (cells.containsKey(key)) {
+          cells.remove(key);
+          rowIO.writeCellOnly(path.toString());
+          return true;
+        } else {
+          return false;
+        }
       }
 //      return data.remove(Cell.createRowColumnOnly(row, column)) != null;
     }
@@ -198,17 +200,13 @@ class SimpleAdmin implements Admin {
 
     @Override
     public void close() throws IOException {
-      data.clear();
+//      data.clear();
       cells.clear();
     }
 
     @Override
     public String getName() {
       return name;
-    }
-
-    private static void call(String v) {
-      System.out.println(v);
     }
 
     private static void createRow(String row) throws IOException {
@@ -242,7 +240,6 @@ class SimpleAdmin implements Admin {
                   .append(v.getValue().getColumnOffset()).append(COMMA).append(v.getValue().getColumnLength())
                   .append(COMMA).append(v.getValue().getValueOffset()).append(COMMA)
                   .append(v.getValue().getValueLength()).append("\n"));
-          call(indexOutput.toString());
           bos.write(indexOutput.toString().getBytes());
           bos.flush();
         }
@@ -350,7 +347,7 @@ class SimpleAdmin implements Admin {
               c = Cell.createCell(cell.getRowArray(), 0, cell.getRowLength(),
                       getColArray(), getColOffset(), getColLength(),
                       valueArray, getValueOffset(), getValueLength());
-              data.put(c, c);
+              cells.put(new String(cell.getColumnArray()), c);
             }
           }
         }
@@ -380,7 +377,6 @@ class SimpleAdmin implements Admin {
               c = Cell.createCell(row, 0, row.length,
                       getColArray(), getColOffset(), getColLength(),
                       valueArray, getValueOffset(), getValueLength());
-              data.put(c, c);
               cells.put(new String(getColArray()), c);
             }
           }

@@ -61,7 +61,7 @@ public class TestTable {
   @Test
   public void testInsert() throws Exception {
     Table t = ADMIN.openTable(TABLE_NAME);
-    Cell newCell = Cell.createCell(ROW_V0, BytesUtil.toBytes("B"), VALUE_V0);
+    Cell newCell = Cell.createCell(ROW_V0, BytesUtil.toBytes("A"), VALUE_V0);
     int firstCount = count(t.get(ROW_V0));
     t.insert(newCell);
     assertEquals(1 + firstCount, count(t.get(ROW_V0)));
